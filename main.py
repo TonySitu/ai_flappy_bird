@@ -1,3 +1,5 @@
+import random
+
 import pygame
 import os
 
@@ -42,7 +44,7 @@ class Bird:
         if displacement < 0:
             displacement -= 2
 
-        self.y = self.y + displacement
+        self.y += displacement
 
         if displacement < 0 or self.y < self.height + 50:
             if self.tilt < self.MAX_ROTATION:
@@ -77,14 +79,46 @@ class Bird:
         return pygame.mask.from_surface(self.img)
 
 
-def draw_window(win, bird):
+class Pipe:
+    GAP = 200
+    VEL = 5
+
+    def __init__(self, x):
+        self.x = self.height = 0
+        self.top = 0
+        self.bottom = 0
+        self.PIPE_TOP = pygame.transform.flip(PIPE_IMAGE, False, True)
+        self.PIP_BOTTOM = PIPE_IMAGE
+
+        self.passed = False
+        self.set_height()
+
+    def set_height(self):
+        self.height = random.randrange(50, 450)
+        self.top = self.height - self.PIPE_TOP.get_height()
+        self.bottom = self.height + self.GAP
+
+    def move(self):
+        self.x -= self.VEL
+
+    def draw(self, win):
+        win.blit(self.PIPE_TOP, (self.x, self.top))
+        win.blit(self.PIP_BOTTOM, (self.x, self.bottom))
+
+
+def draw_window(win, bird, pipes, base):
     win.blit(BG_IMAGE, (0, 0))
+
+    for pip in pipes:
+        pip.draw(win)
+
+    base.draw(win)
     bird.draw(win)
     pygame.display.update()
 
 
 def main():
-    bird = Bird(200, 200)
+    bird = Bird(230, 350)
     win = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     clock = pygame.time.Clock()
 
