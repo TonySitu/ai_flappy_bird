@@ -116,7 +116,7 @@ class Pipe:
         bottom_offset = (self.x - bird.x, self.bottom - round(bird.y))
 
         b_point = bird_mask.overlap(bottom_mask, bottom_offset)
-        t_point = bird.mask.overlap(top_mask, top_offset)
+        t_point = bird_mask.overlap(top_mask, top_offset)
 
         if t_point or b_point:
             return True
@@ -166,8 +166,8 @@ def main():
     win = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     base = Base(730)
     pipes = [Pipe(700)]
-
     clock = pygame.time.Clock()
+    score = 0
 
     run = True
     while run:
@@ -176,9 +176,28 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
-        bird.move()
+        pipes_to_remove = []
+        add_pipe = False
         for pipe in pipes:
+            if pipe.collide(bird):
+                pass
+
+            if pipe.x + pipe.PIPE_TOP.get_width() < 0:
+                pipes_to_remove.append(pipe)
+
+            if not pipe.passed and pipe.x < bird.x:
+                pipe.passed = True
+                add_pipe = True
+
             pipe.move()
+
+        if add_pipe:
+            score += 1
+            pipes.append(Pipe(700))
+            for pipe in pipes_to_remove:
+                pipes.remove(pipe)
+
+        bird.move()
         base.move()
         draw_window(win, bird, pipes, base)
 
