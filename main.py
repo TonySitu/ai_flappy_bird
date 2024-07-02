@@ -1,6 +1,7 @@
 import random
 import pygame
 import os
+import neat
 from mutable_int import MutableInt
 
 pygame.font.init()
@@ -195,7 +196,7 @@ def check_floor_collision(bird, base, score):
         pass
 
 
-def main():
+def evaluate_genomes(genomes, config):
     bird = Bird(230, 350)
     win = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     base = Base(730)
@@ -203,23 +204,43 @@ def main():
     clock = pygame.time.Clock()
     score = MutableInt(0)
 
-    run = True
-    while run:
+    running = True
+    while running:
         clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
+                running = False
 
         handle_pipes(pipes, bird, score)
 
         check_floor_collision(bird, base, score)
 
-        #bird.move()
+        # bird.move()
         base.move()
         draw_window(win, bird, pipes, base, score)
 
     pygame.quit()
     quit()
+
+
+def simulate_run(config_path):
+    config = neat.config.Config(neat.DefaultGenome,
+                                neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet,
+                                neat.DefaultStagnation,
+                                config_path)
+    population = neat.Population(config)
+    population.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    population.add_reporter(stats)
+
+    winner = population.run(evaluate_genomes(), 50)
+
+
+def main():
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, "neat_config")
+    simulate_run(config_path)
 
 
 if __name__ == '__main__':
