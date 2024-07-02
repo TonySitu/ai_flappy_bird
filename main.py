@@ -152,89 +152,131 @@ class Base:
         win.blit(self.IMG, (self.x2, self.y))
 
 
-def draw_window(win, bird, pipes, base, score):
+def draw_window(win, birds, pipes, base, score, gen_counter):
     win.blit(BG_IMAGE, (0, 0))
 
     for pipe in pipes:
         pipe.draw(win)
 
-    text = STAT_FONT.render(f"Score: {score}", 1, (255, 255, 255))
-    win.blit(text, (WINDOW_WIDTH - 10 - text.get_width(), 10))
-
     base.draw(win)
-    bird.draw(win)
+
+    for bird in birds:
+        bird.draw(win)
+
+    score_text = STAT_FONT.render(f"Score: {score}", 1, (255, 255, 255))
+    win.blit(score_text, (WINDOW_WIDTH - 10 - score_text.get_width(), 10))
+
+    gen_text = STAT_FONT.render(f"Gen: {gen_counter}", 1, (255, 255, 255))
+    win.blit(gen_text, (10, 10))
 
     pygame.display.update()
 
 
-def handle_pipes(pipes, bird, score):
+def handle_pipes(pipes, birds, score, nets, ge):
     pipes_to_remove = []
     add_pipe = False
     for pipe in pipes:
-        if pipe.collide(bird):
-            pass
+        for x, bird in enumerate(birds):
+            if pipe.collide(bird):
+                ge[x].fitness -= 1
+                birds.pop(x)
+                nets.pop(x)
+                ge.pop(x)
+
+            if not pipe.passed and pipe.x < bird.x:
+                pipe.passed = True
+                add_pipe = True
 
         if pipe.x + pipe.PIPE_TOP.get_width() < 0:
             pipes_to_remove.append(pipe)
 
-        if not pipe.passed and pipe.x < bird.x:
-            pipe.passed = True
-            add_pipe = True
-
         pipe.move()
 
     if add_pipe:
-        score.increment()
+        score += 1
         pipes.append(Pipe(700))
+
+        for g in ge:
+            g.fitness += 5
 
     for pipe in pipes_to_remove:
         pipes.remove(pipe)
 
 
-def check_floor_collision(bird, base, score):
-    if bird.y + bird.img.get_height() > 730:
-        pass
+def check_floor_collision(birds, nets, ge):
+    for x, bird in enumerate(birds):
+        if bird.y + bird.img.get_height() >= 730 or bird.y < 0:
+            birds.pop(x)
+            nets.pop(x)
+            ge.pop(x)
 
 
-def evaluate_genomes(genomes, config):
-    bird = Bird(230, 350)
+def evaluate_genomes_wrapper(genomes, config, gen_counter):
+    evaluate_genomes(genomes, config, gen_counter)
+    gen_counter += 1
+
+
+def evaluate_genomes(genomes, config, gen_counter):
+    nets = []
+    ge = []
+    birds = []
+
+    for _, g in genomes:
+        net = neat.nn.FeedForwardNetwork.create(g, config)
+        nets.append(net)
+        birds.append(Bird(230, 350))
+        g.fitness = 0
+        ge.append(g)
+
     win = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     base = Base(730)
     pipes = [Pipe(700)]
     clock = pygame.time.Clock()
     score = MutableInt(0)
 
-    running = True
-    while running:
-        clock.tick(30)
+    while True:
+        clock.tick(60)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                pygame.quit()
+                quit()
 
-        handle_pipes(pipes, bird, score)
+        pipe_ind = 0
+        if len(birds) > 0:
+            if len(pipes) > 1 and birds[0].x > pipes[0].x + pipes[0].PIPE_TOP.get_width():
+                pipe_ind = 1
+        else:
+            break
 
-        check_floor_collision(bird, base, score)
+        for x, bird in enumerate(birds):
+            bird.move()
+            ge[x].fitness += 0.1
 
-        # bird.move()
+            output = nets[x].activate((bird.y, abs(bird.y - pipes[pipe_ind].height),
+                                       abs(bird.y - pipes[pipe_ind].bottom)))
+            if output[0] > 0.5:
+                bird.jump()
+
+        handle_pipes(pipes, birds, score, nets, ge)
+
+        check_floor_collision(birds, nets, ge)
         base.move()
-        draw_window(win, bird, pipes, base, score)
-
-    pygame.quit()
-    quit()
+        draw_window(win, birds, pipes, base, score, gen_counter)
 
 
 def simulate_run(config_path):
-    config = neat.config.Config(neat.DefaultGenome,
-                                neat.DefaultReproduction,
-                                neat.DefaultSpeciesSet,
-                                neat.DefaultStagnation,
-                                config_path)
-    population = neat.Population(config)
+    configuration = neat.config.Config(neat.DefaultGenome,
+                                       neat.DefaultReproduction,
+                                       neat.DefaultSpeciesSet,
+                                       neat.DefaultStagnation,
+                                       config_path)
+    population = neat.Population(configuration)
     population.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     population.add_reporter(stats)
-
-    winner = population.run(evaluate_genomes(), 50)
+    gen_counter = MutableInt(0)
+    print(gen_counter)
+    population.run(lambda genomes, config: evaluate_genomes_wrapper(genomes, config, gen_counter), 50)
 
 
 def main():
