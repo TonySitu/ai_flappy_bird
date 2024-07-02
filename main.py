@@ -275,7 +275,7 @@ def simulate_run(config_path):
     stats = neat.StatisticsReporter()
     population.add_reporter(stats)
     gen_counter = MutableInt(0)
-    print(gen_counter)
+
     population.run(lambda genomes, config: evaluate_genomes_wrapper(genomes, config, gen_counter), 50)
 
 
